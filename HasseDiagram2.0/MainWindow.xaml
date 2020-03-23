@@ -4,23 +4,86 @@
         xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
         mc:Ignorable="d"
-        Title="MainWindow" Height="350" Width="525">
+        Title="MainWindow"
+        Height="350"
+        Width="525">
     <Grid>
 
         <Grid.RowDefinitions>
-            <RowDefinition Height="22.92"/>
-            <RowDefinition Height="20.50"/>
-            <RowDefinition Height="20.50"/>
-            <RowDefinition Height="*"/>
+            <RowDefinition Height="auto" />
+            <RowDefinition Height="*" />
+            <RowDefinition Height="auto" />
         </Grid.RowDefinitions>
-        <TextBlock>Enter letters used for powerset:</TextBlock>
-        <TextBox Grid.Row="0" KeyDown="txt_vars_KeyDown" Text= "a,b,c,d"  Height="20px" HorizontalAlignment="Right" VerticalAlignment="Top" Name="TxtVars" Width="150"></TextBox>
-        <TextBlock Grid.Row="1">Distance between Nodes:</TextBlock>
-        <TextBox Width="150" HorizontalAlignment="Right" Grid.Row="1"  Text="2" Name="TxtDistance" KeyDown="txt_vars_KeyDown"/>
-        <Border Grid.Row="3" Name="Border">
-            <Image Name="ImgGraph" Opacity="1" RenderTransformOrigin="0.5,0.5" />
+        <Grid.ColumnDefinitions>
+            <ColumnDefinition Width="*" />
+            <ColumnDefinition Width="200" />
+        </Grid.ColumnDefinitions>
+
+        <Grid>
+            <Grid.RowDefinitions>
+                <RowDefinition />
+                <RowDefinition />
+                <RowDefinition />
+                <RowDefinition />
+                <RowDefinition />
+            </Grid.RowDefinitions>
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="2*" />
+                <ColumnDefinition />
+            </Grid.ColumnDefinitions>
+
+            <TextBlock Text="Enter letters used for powerset:" />
+            <TextBox Grid.Column="1"
+                     Margin="3"
+                     KeyDown="txt_vars_KeyDown"
+                     Text="{Binding Path=Vars, Mode=TwoWay}" />
+
+            <TextBlock Grid.Row="1"
+                       Text="Distance between Nodes:" />
+            <TextBox Grid.Row="1"
+                     Grid.Column="1"
+                     Margin="3"
+                     KeyDown="txt_vars_KeyDown"
+                     Text="{Binding Path=Distance, Mode=TwoWay}" />
+
+            <TextBlock Grid.Row="2"
+                       Text="Output Format" />
+            <ComboBox Grid.Row="2"
+                      Grid.Column="1"
+                      Margin="3"
+                      SelectedItem="{Binding Path=SelectedType, Mode=TwoWay}"
+                      ItemsSource="{Binding Path=AvailableTypes}" />
+
+            <Button Grid.Row="3"
+                    Grid.Column="1"
+                    Margin="3"
+                    Content="Generate"
+                    Click="btnGenerate_Click" />
+
+            <Button Grid.Row="4"
+                    Grid.Column="1"
+                    Margin="3"
+                    Content="Save Result"
+                    Click="btnSave_Click" />
+        </Grid>
+
+        <Border Grid.Row="1"
+                Panel.ZIndex="-1"
+                Name="Border"
+                ClipToBounds="True">
+            <Image Name="ImgGraph"
+                   RenderTransformOrigin="0.5,0.5"
+                   Source="{Binding Path=Image, Mode=OneWay}" />
         </Border>
-        <TextBlock Grid.Row="2" HorizontalAlignment="Left" VerticalAlignment="Bottom" Text="Number of Subsets:"></TextBlock>
-        <TextBlock Grid.Row="2" HorizontalAlignment="Right" Text="0" Margin="450,0,140,0" Name="TxtNumOfSubsets"></TextBlock>
+
+        <Grid Grid.Row="2">
+            <TextBlock Text="{Binding Path=Subsets, StringFormat=Number of Subsets: {0}, Mode=OneWay}" />
+        </Grid>
+
+        <Grid Grid.Row="0"
+              Grid.Column="1"
+              Grid.RowSpan="3">
+            <TextBox Text="{Binding GraphVizCode, Mode=OneWay}" />
+        </Grid>
     </Grid>
 </Window>

@@ -1,34 +1,80 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.ComponentModel;
 using System.Globalization;
 using System.IO;
 using System.Linq;
+using System.Runtime.CompilerServices;
 using System.Text;
 using System.Windows;
+using System.Windows.Controls;
 using System.Windows.Input;
 using System.Windows.Media;
 using System.Windows.Media.Imaging;
 using GraphVizWrapper;
 using GraphVizWrapper.Commands;
 using GraphVizWrapper.Queries;
+using SharpVectors.Converters;
 
 namespace HasseDiagram2._0
 {
     /// <summary>
     ///     Interaction logic for MainWindow.xaml
     /// </summary>
-    public partial class MainWindow
+    public partial class MainWindow : INotifyPropertyChanged
     {
+        #region "INotifyPropertyChanged"
+        public event PropertyChangedEventHandler PropertyChanged;
+        public void NotifyPropertyChanged([CallerMemberName] string propertyName = null)
+            => PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(propertyName));
+
+        protected bool SetProperty<Tprop>(ref Tprop storage, Tprop value, [CallerMemberName] string propertyName = null)
+        {
+            if (Equals(storage, value))
+                return false;
+
+            storage = value;
+            NotifyPropertyChanged(propertyName);
+            return true;
+        }
+        #endregion
+
         private readonly GraphGeneration _wrapperForGraph;
         private Point _origin;
         private Point _start;
 
+        private byte[] _ImageData = null;
+        public bool HasImageData { get => _ImageData != null; }
+
+        private string _Vars = "a,b,c,d";
+        public string Vars { get => _Vars; set => SetProperty(ref _Vars, value); }
+
+        private double _Distance = 0.8;
+        public double Distance { get => _Distance; set => SetProperty(ref _Distance, value); }
+
+        private double _Subsets = 2;
+        public double Subsets { get => _Subsets; set => SetProperty(ref _Subsets, value); }
+
+        private string _GraphVizCode = "";
+        public string GraphVizCode { get => _GraphVizCode; set => SetProperty(ref _GraphVizCode, value); }
+
+        private ImageSource _Image;
+        public ImageSource Image { get => _Image; set => SetProperty(ref _Image, value); }
+
+        private Enums.GraphReturnType _SelectedType = Enums.GraphReturnType.Png;
+        public Enums.GraphReturnType SelectedType { get => _SelectedType; set => SetProperty(ref _SelectedType, value); }
+
+        public static Enums.GraphReturnType[] AvailableTypes { get; } = new Enums.GraphReturnType[] {
+                Enums.GraphReturnType.Jpg,
+                Enums.GraphReturnType.Png,
+                Enums.GraphReturnType.Svg,
+            };
+
         public MainWindow()
         {
             InitializeComponent();
-    
-            #region "zooming"
 
+            #region "zooming"
             var group = new TransformGroup();
             var xform = new ScaleTransform();
             group.Children.Add(xform);
@@ -39,8 +85,8 @@ namespace HasseDiagram2._0
             ImgGraph.MouseLeftButtonDown += image_MouseLeftButtonDown;
             ImgGraph.MouseLeftButtonUp += image_MouseLeftButtonUp;
             ImgGraph.MouseMove += image_MouseMove;
-
             #endregion
+
             #region "Initializing GraphViz.NET"
             var getStartProcessQuery = new GetStartProcessQuery();
             var getProcessStartInfoQuery = new GetProcessStartInfoQuery();
@@ -51,39 +97,51 @@ namespace HasseDiagram2._0
                 getProcessStartInfoQuery,
                 registerLayoutPluginCommand);
             _wrapperForGraph = wrapper;
-#endregion
+            #endregion
+
+            this.DataContext = this;
         }
 
-      
+
         private void GetGraph(IGraphGeneration wrapper)
         {
-            var set = TxtVars.Text.Split(',');
-            TxtNumOfSubsets.Text = Math.Pow(2, set.Length).ToString(CultureInfo.InvariantCulture);
+            var set = Vars.Split(',');
+            Subsets = Math.Pow(2, set.Length);
+
+            // Build the DOT code for GraphViz
             var sb = new StringBuilder();
             sb.Append("digraph{");
-            sb.AppendLine("graph [ranksep=\"" + TxtDistance.Text + "\", nodesep=\"" + TxtDistance.Text +"\"];");
-            for (var i = 0; i < Math.Pow(2,set.Length); i++)
+            sb.AppendLine("graph [ranksep=\"" + Distance + "\", nodesep=\"" + Distance + "\"];");
+            for (var i = 0; i < Math.Pow(2, set.Length); i++)
             {
                 var newList = new List<string>();
                 for (var j = 0; j < set.Length; j++)
                 {
-                    var isList = i & (1 << j); 
-                   
-                    if (isList > 0)
+                    if ((i & (1 << j)) > 0)
                         newList.Add(set[j]);
                 }
                 if (newList.Count != set.Length)
                     PrintLinks(newList, set, sb);
             }
             sb.Append("}");
-            var output = wrapper.GenerateGraph(sb.ToString(), Enums.GraphReturnType.Png);
-            var img = LoadImage(output);
-            Width = img.Width + 20;
-            Height = img.Height + 20;
-            ImgGraph.Source = LoadImage(output);
+
+            // Display the generated code
+            GraphVizCode = sb.ToString();
+
+            // Call GraphViz to generate the graph
+            var output = wrapper.GenerateGraph(sb.ToString(), SelectedType);
+
+            if (SelectedType == Enums.GraphReturnType.Svg)
+                Image = LoadSvgImage(output, (int)this.Height, (int)this.Width);
+            else
+                Image = LoadBitmapImage(output);
+
+            // Store ImageData
+            _ImageData = output;
+            NotifyPropertyChanged(nameof(HasImageData));
         }
 
-        private static BitmapImage LoadImage(byte[] imageData)
+        private static BitmapImage LoadBitmapImage(byte[] imageData)
         {
             if ((imageData == null) || (imageData.Length == 0)) return null;
             var image = new BitmapImage();
@@ -101,6 +159,35 @@ namespace HasseDiagram2._0
             return image;
         }
 
+        private static ImageSource LoadSvgImage(byte[] imageData, int height, int width)
+        {
+            if ((imageData == null) || (imageData.Length == 0)) return null;
+
+            using (var memIn = new MemoryStream(imageData))
+            {
+                var settings = new SharpVectors.Renderers.Wpf.WpfDrawingSettings()
+                {
+                    PixelHeight = height,
+                    PixelWidth = width,
+                    IncludeRuntime = true,
+
+                };
+
+                var ssc = new StreamSvgConverter(settings);
+
+                using (var memOut = new MemoryStream())
+                {
+                    if (ssc.Convert(memIn, memOut))
+                    {
+                        // The docs were bad, but this seems to be working fine
+                        return new DrawingImage(ssc.Drawing);
+                    }
+                }
+            }
+
+            return null;
+        }
+
         private static void PrintLinks(List<string> list, IEnumerable<string> arr, StringBuilder sb)
         {
             foreach (var value in arr)
@@ -116,10 +203,7 @@ namespace HasseDiagram2._0
 
         private static string GetListAsString(List<string> set)
         {
-            set.Sort();
-            if (set.Count == 0)
-                return "\"{}\"";
-            return "\"{" + string.Join(",", set.ToArray()) + "}\"";
+            return "\"{" + string.Join(",", set.OrderBy(s => s)) + "}\"";
         }
 
         private void image_MouseLeftButtonUp(object sender, MouseButtonEventArgs e)
@@ -133,7 +217,7 @@ namespace HasseDiagram2._0
 
             var tt =
                 (TranslateTransform)
-                ((TransformGroup) ImgGraph.RenderTransform).Children.First(tr => tr is TranslateTransform);
+                ((TransformGroup)ImgGraph.RenderTransform).Children.First(tr => tr is TranslateTransform);
             var v = _start - e.GetPosition(Border);
             tt.X = _origin.X - v.X;
             tt.Y = _origin.Y - v.Y;
@@ -144,15 +228,15 @@ namespace HasseDiagram2._0
             ImgGraph.CaptureMouse();
             var tt =
                 (TranslateTransform)
-                ((TransformGroup) ImgGraph.RenderTransform).Children.First(tr => tr is TranslateTransform);
+                ((TransformGroup)ImgGraph.RenderTransform).Children.First(tr => tr is TranslateTransform);
             _start = e.GetPosition(Border);
             _origin = new Point(tt.X, tt.Y);
         }
 
         private void image_MouseWheel(object sender, MouseWheelEventArgs e)
         {
-            var transformGroup = (TransformGroup) ImgGraph.RenderTransform;
-            var transform = (ScaleTransform) transformGroup.Children[0];
+            var transformGroup = (TransformGroup)ImgGraph.RenderTransform;
+            var transform = (ScaleTransform)transformGroup.Children[0];
 
             var zoom = e.Delta > 0 ? .2 : -.2;
             transform.ScaleX += zoom;
@@ -161,8 +245,49 @@ namespace HasseDiagram2._0
 
         private void txt_vars_KeyDown(object sender, KeyEventArgs e)
         {
-            if (e.Key == Key.Enter)
+            if (e.Key == Key.Enter && sender.GetType() == typeof(TextBox))
+            {
+                var tb = (TextBox)sender;
+                tb.GetBindingExpression(TextBox.TextProperty).UpdateSource();
                 GetGraph(_wrapperForGraph);
+            }
+        }
+
+        private void btnGenerate_Click(object sender, RoutedEventArgs e)
+        {
+            GetGraph(_wrapperForGraph);
+        }
+
+        private void btnSave_Click(object sender, RoutedEventArgs e)
+        {
+            if(_ImageData == null)
+            {
+                MessageBox.Show("No Image Data generated yet.");
+                return;
+            }
+
+            try
+            {
+                var ext = _SelectedType.ToString().ToLower();
+
+                var sfd = new Microsoft.Win32.SaveFileDialog()
+                {
+                    Filter = $"{ext.ToUpper()} File|*.{ext}",
+                    AddExtension = true,
+                    OverwritePrompt = true,
+                    FileName = $"hasse.{ext}",
+                };
+
+                var result = sfd.ShowDialog(this);
+                if (result.HasValue && result == true)
+                {
+                    File.WriteAllBytes(sfd.FileName, _ImageData);
+                }
+            }
+            catch(Exception ex)
+            {
+                MessageBox.Show("Error saving file: " + ex.Message);
+            }
         }
     }
 }
