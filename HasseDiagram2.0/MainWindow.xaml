@@ -8,10 +8,11 @@
     <Grid>
 
         <Grid.RowDefinitions>
-            <RowDefinition Height="22.92"/>
-            <RowDefinition Height="20.50"/>
-            <RowDefinition Height="20.50"/>
+            <RowDefinition Height="auto"/>
+            <RowDefinition Height="auto"/>
+            <RowDefinition Height="auto"/>
             <RowDefinition Height="*"/>
+            <RowDefinition Height="auto"/>
         </Grid.RowDefinitions>
         <TextBlock>Enter letters used for powerset:</TextBlock>
         <TextBox Grid.Row="0" KeyDown="txt_vars_KeyDown" Text= "a,b,c,d"  Height="20px" HorizontalAlignment="Right" VerticalAlignment="Top" Name="TxtVars" Width="150"></TextBox>
@@ -22,5 +23,7 @@
         </Border>
         <TextBlock Grid.Row="2" HorizontalAlignment="Left" VerticalAlignment="Bottom" Text="Number of Subsets:"></TextBlock>
         <TextBlock Grid.Row="2" HorizontalAlignment="Right" Text="0" Margin="450,0,140,0" Name="TxtNumOfSubsets"></TextBlock>
+        <TextBox Name="GraphVizCode"
+                 Grid.Row="4" Height="45" TextWrapping="Wrap" />
     </Grid>
 </Window>

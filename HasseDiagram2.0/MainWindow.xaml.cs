@@ -76,6 +76,10 @@ namespace HasseDiagram2._0
                     PrintLinks(newList, set, sb);
             }
             sb.Append("}");
+
+            // Display the generated code
+            GraphVizCode.Text = sb.ToString();
+
             var output = wrapper.GenerateGraph(sb.ToString(), Enums.GraphReturnType.Png);
             var img = LoadImage(output);
             Width = img.Width + 20;
